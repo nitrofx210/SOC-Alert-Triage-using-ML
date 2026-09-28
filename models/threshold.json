@@ -1,0 +1,5 @@
+{
+  "selected_threshold": null,
+  "status": "not_selected",
+  "reason": "No positive-labeled chronological validation set exists after the available red-team label period."
+}

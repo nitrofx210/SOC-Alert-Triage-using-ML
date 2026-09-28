@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+
+# Local datasets and generated outputs
+/data/
+/models/*.joblib
+/models/*.pkl
+/models/*.pickle
+
+# Local editors and operating-system metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

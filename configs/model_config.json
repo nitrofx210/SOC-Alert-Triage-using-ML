@@ -1,0 +1,20 @@
+{
+  "experiment": "legacy_lanl_logistic_diagnostic",
+  "random_seed": 42,
+  "split": "stratified random 75/25; diagnostic only",
+  "sampled_negative_to_positive_ratio": 20.0,
+  "sampling_note": "Sampling was performed upstream before splitting; the prepared sample is not a representative deployment stream.",
+  "features": [
+    "authentication_type",
+    "logon_type",
+    "orientation",
+    "success",
+    "hour_of_day",
+    "machine_account",
+    "same_computer"
+  ],
+  "model": "LogisticRegression(max_iter=1000, class_weight='balanced')",
+  "threshold": 0.5,
+  "threshold_status": "legacy default; not validated for operations",
+  "calibration": "none"
+}
