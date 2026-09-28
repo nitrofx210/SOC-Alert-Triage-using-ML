@@ -404,14 +404,16 @@ leakage, but none has passed a future-period or unseen-entity test.
 
 ## Baselines and final-model status
 
-Only the historical logistic-regression baseline was run. Random forest,
-gradient boosting, and anomaly-detection comparisons are intentionally not
-presented as model-selection evidence: there is no positive-labeled temporal
-validation/test set on which to compare them validly. Hyperparameter tuning,
-calibration, validation threshold selection, bootstrap intervals, and a
-precision-recall operating curve are not claimed. The CSV can reproduce the
-legacy random-split diagnostic, but not the requested scientifically valid
-final evaluation.
+The historical logistic-regression baseline and a separate chronological
+threshold experiment are reported. Random forest, gradient boosting, and
+anomaly-detection comparisons are intentionally not presented as model
+selection evidence. The chronological experiment selects a cutoff on one
+labeled interval and evaluates it on a later interval, but both are within
+the limited ground-truth period and the negative class was sampled globally.
+It does not establish prospective performance, natural-prevalence precision,
+or calibration. Bootstrap intervals and a production operating point are not
+claimed. The CSV cannot establish performance after the last labeled
+red-team event.
 
 The coefficient export is exploratory only. It reflects a model fit to the
 biased random-split training fold and is not causal or validated importance.
@@ -486,8 +488,11 @@ The latest available red-team event is at timestamp {latest_positive:,}.
 Later periods contain no positive ground truth, so they cannot measure future
 red-team recall, ROC-AUC, Average Precision, or precision. Calibration,
 precision-at-recall, validation threshold selection, and confidence intervals
-are therefore **not available**. No recommended operating threshold is
-selected; `models/threshold.json` records this intentionally.
+are therefore **not available for this particular 60/20/20 split**. A
+separate historical operating-point experiment uses positive-timestamp
+quantiles to obtain labeled validation and test windows; see
+`temporal_threshold_evaluation.md`. Its threshold is not a prospective or
+production recommendation.
 
 ## Features, leakage, and generalization
 
@@ -505,11 +510,12 @@ probabilities, or production-ready classifier is claimed.
 
 ## Conclusion and reproducibility
 
-There is no trustworthy after-metric or final model to recommend. A lower
-metric from a future-labeled temporal test would be more meaningful than the
-legacy random result, but that test cannot be computed without later-period
-ground truth. Do not deploy this model or use its scores as probabilities of
-compromise.
+The legacy random holdout is not a trustworthy future-period result. A
+historical chronological holdout within the available label period is
+available in `temporal_threshold_evaluation.md`, but it is not an independent
+post-label-period test. Later-period positive ground truth is still needed to
+measure deployment-time performance. Do not deploy this model or use its
+scores as probabilities of compromise.
 
 Reproduce the audit and legacy diagnostic with:
 
@@ -517,14 +523,18 @@ Reproduce the audit and legacy diagnostic with:
 python -m soc_ml.cli audit-lanl --data data\\lanl_auth_sample.csv --auth-events-scanned {auth_events_scanned} --redteam-events-matched {redteam_events_matched} --report-dir reports
 ```
 
-The audit is deterministic (seed 42). For inference on a raw auth file, the legacy model can
-produce a streamed ranking score:
+The audit is deterministic (seed 42). For inference with the baseline model,
+score a raw auth file to obtain an uncalibrated ranking score:
 
 ```powershell
 python -m soc_ml.cli score-lanl-auth --auth data\\new_auth.txt.gz --model models\\lanl_redteam.joblib --output data\\new_auth_scores.csv.gz
 ```
 
-The score is uncalibrated and no decision threshold is selected.
+The score is uncalibrated and no decision threshold is implicit. To use the
+separately validation-selected historical threshold, first create the
+`lanl_redteam_temporal.joblib` and `lanl_temporal_threshold.json` artifacts
+with `tune-lanl-threshold`, then pass that JSON with `--threshold-file`. This
+threshold is not production-validated.
 """
     (report_dir / "final_model_evaluation.md").write_text(
         evaluation, encoding="utf-8"

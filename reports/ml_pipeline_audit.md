@@ -125,14 +125,16 @@ leakage, but none has passed a future-period or unseen-entity test.
 
 ## Baselines and final-model status
 
-Only the historical logistic-regression baseline was run. Random forest,
-gradient boosting, and anomaly-detection comparisons are intentionally not
-presented as model-selection evidence: there is no positive-labeled temporal
-validation/test set on which to compare them validly. Hyperparameter tuning,
-calibration, validation threshold selection, bootstrap intervals, and a
-precision-recall operating curve are not claimed. The CSV can reproduce the
-legacy random-split diagnostic, but not the requested scientifically valid
-final evaluation.
+The historical logistic-regression baseline and a separate chronological
+threshold experiment are reported. Random forest, gradient boosting, and
+anomaly-detection comparisons are intentionally not presented as model
+selection evidence. The chronological experiment selects a cutoff on one
+labeled interval and evaluates it on a later interval, but both are within
+the limited ground-truth period and the negative class was sampled globally.
+It does not establish prospective performance, natural-prevalence precision,
+or calibration. Bootstrap intervals and a production operating point are not
+claimed. The CSV cannot establish performance after the last labeled
+red-team event.
 
 The coefficient export is exploratory only. It reflects a model fit to the
 biased random-split training fold and is not causal or validated importance.

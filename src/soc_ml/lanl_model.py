@@ -2,6 +2,7 @@
 
 import gzip
 import math
+import math
 from pathlib import Path
 
 import joblib
@@ -139,12 +140,18 @@ def score_lanl_auth(
     output_path: Path,
     *,
     chunksize: int = 100_000,
+    threshold: float | None = None,
 ) -> int:
     """Score raw auth rows in chunks without requiring red-team labels."""
     if chunksize < 1:
         raise ValueError("chunksize must be at least 1")
     if output_path.resolve() in {auth_path.resolve(), model_path.resolve()}:
         raise ValueError("Output path must differ from the auth input and model")
+    if threshold is not None:
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+            raise ValueError("threshold must be a finite number between 0 and 1")
+        if not math.isfinite(threshold) or not 0 <= threshold <= 1:
+            raise ValueError("threshold must be a finite number between 0 and 1")
 
     model: Pipeline = joblib.load(model_path)
     classes = list(model.classes_)
@@ -160,6 +167,8 @@ def score_lanl_auth(
         else output_path.open("w", newline="", encoding="utf-8")
     )
     output_columns = ["time", *LANL_FEATURE_COLUMNS, "redteam_score"]
+    if threshold is not None:
+        output_columns.append("predicted_label")
     with output_context as output_file:
         pd.DataFrame(columns=output_columns).to_csv(output_file, index=False)
         for chunk in pd.read_csv(
@@ -204,6 +213,11 @@ def score_lanl_auth(
             scored = features.copy()
             scored.insert(0, "time", [record[0] for record in records])
             scored["redteam_score"] = scores
+            if threshold is not None:
+                scored["predicted_label"] = [
+                    "redteam" if score >= threshold else "normal"
+                    for score in scores
+                ]
             scored.to_csv(output_file, index=False, header=False)
             rows_written += len(scored)
 

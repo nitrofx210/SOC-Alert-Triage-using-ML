@@ -1,6 +1,7 @@
 """Command-line interface for generating, training, and scoring SOC alerts."""
 
 import argparse
+import json
 from pathlib import Path
 
 from soc_ml.audit import audit_lanl_sample
@@ -8,6 +9,7 @@ from soc_ml.data import generate_synthetic_alerts
 from soc_ml.lanl import prepare_lanl_auth
 from soc_ml.lanl_model import score_lanl_auth, score_lanl_events, train_lanl_model
 from soc_ml.model import score_alerts, train_model
+from soc_ml.operating_point import fit_lanl_temporal_operating_point
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -73,6 +75,27 @@ def _parser() -> argparse.ArgumentParser:
     lanl_auth_score.add_argument("--model", type=Path, required=True)
     lanl_auth_score.add_argument("--output", type=Path, required=True)
     lanl_auth_score.add_argument("--chunksize", type=int, default=100_000)
+    threshold_group = lanl_auth_score.add_mutually_exclusive_group()
+    threshold_group.add_argument(
+        "--threshold",
+        type=float,
+        help="optional explicit cutoff in [0, 1]; adds predicted_label to output",
+    )
+    threshold_group.add_argument(
+        "--threshold-file",
+        type=Path,
+        help="JSON artifact created by tune-lanl-threshold",
+    )
+
+    threshold_tune = commands.add_parser(
+        "tune-lanl-threshold",
+        help="select a threshold on temporal validation and evaluate a later holdout",
+    )
+    threshold_tune.add_argument("--data", type=Path, required=True)
+    threshold_tune.add_argument("--model", type=Path, required=True)
+    threshold_tune.add_argument("--threshold-output", type=Path, required=True)
+    threshold_tune.add_argument("--report", type=Path, required=True)
+    threshold_tune.add_argument("--target-recall", type=float, default=0.90)
     return parser
 
 
@@ -149,13 +172,59 @@ def main() -> None:
         scored.to_csv(args.output, index=False)
         print(f"Wrote uncalibrated red-team ranking scores for {len(scored)} events to {args.output}")
     elif args.command == "score-lanl-auth":
+        threshold = args.threshold
+        if args.threshold_file is not None:
+            _ensure_distinct_output(
+                args.output, args.auth, args.model, args.threshold_file
+            )
+            threshold_data = json.loads(
+                args.threshold_file.read_text(encoding="utf-8")
+            )
+            threshold = threshold_data.get("selected_threshold")
+            if threshold is None:
+                raise ValueError("Threshold file does not contain a selected threshold")
+        else:
+            _ensure_distinct_output(args.output, args.auth, args.model)
         rows = score_lanl_auth(
-            args.auth, args.model, args.output, chunksize=args.chunksize
+            args.auth,
+            args.model,
+            args.output,
+            chunksize=args.chunksize,
+            threshold=threshold,
         )
         print(
             f"Wrote uncalibrated red-team ranking scores for {rows:,} raw "
             f"auth events to {args.output}"
         )
+        if threshold is not None:
+            print(f"Applied explicit threshold: {threshold:.6f}")
+    elif args.command == "tune-lanl-threshold":
+        result = fit_lanl_temporal_operating_point(
+            args.data,
+            args.model,
+            args.threshold_output,
+            args.report,
+            target_recall=args.target_recall,
+        )
+        print(f"Saved temporal diagnostic model to {args.model}")
+        print(
+            "Validation-selected threshold: "
+            f"{result['selected_threshold']:.6f}"
+        )
+        test_metrics = result["test"]["metrics_at_validation_selected_threshold"]
+        print(
+            "Later holdout red-team precision/recall: "
+            f"{test_metrics['redteam_precision']:.3f}/"
+            f"{test_metrics['redteam_recall']:.3f}"
+        )
+        default_metrics = result["test"]["metrics_at_default_threshold_0_5"]
+        print(
+            "At the default 0.5 cutoff, later holdout red-team precision/recall: "
+            f"{default_metrics['redteam_precision']:.3f}/"
+            f"{default_metrics['redteam_recall']:.3f}"
+        )
+        print(f"Saved threshold metadata to {args.threshold_output}")
+        print(f"Saved evaluation report to {args.report}")
 
 
 if __name__ == "__main__":

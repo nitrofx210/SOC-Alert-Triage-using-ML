@@ -95,6 +95,49 @@ provided for reference only—not as a valid future-period model evaluation:
 python -m soc_ml.cli train-lanl --data data\lanl_auth_sample.csv --model models\lanl_redteam.joblib
 ```
 
+### Reduce the alert rate with a validation-selected threshold
+
+To examine the recall/precision tradeoff, run the chronological experiment:
+
+```powershell
+python -m soc_ml.cli tune-lanl-threshold --data data\lanl_auth_sample.csv --model models\lanl_redteam_temporal.joblib --threshold-output models\lanl_temporal_threshold.json --report reports\temporal_threshold_evaluation.md --target-recall 0.90
+```
+
+This fits only on the earliest labeled window, selects the **highest threshold
+that achieves at least 90% red-team recall on the next window**, and evaluates
+that one threshold on the later labeled holdout. It does not tune against the
+holdout. The 90% value is an example recall floor, not a validated operational
+target.
+
+In the current sample, the validation-selected threshold was **0.90993**. On
+the later holdout, compared with threshold 0.5:
+
+| Metric | Threshold 0.5 | Validation-selected threshold |
+|---|---:|---:|
+| Red-team precision | 0.532 | 0.585 |
+| Red-team recall | 1.000 | 0.824 |
+| Normal precision | 1.000 | 0.992 |
+| False-positive rate | 4.13% | 2.74% |
+
+So the change reduces red-team recall and improves red-team precision, but
+**does not improve both class precisions**: normal precision falls slightly as
+some red-team events become false negatives. This is the expected
+precision/recall tradeoff, not a guarantee about deployment behavior. The
+temporal holdout still uses globally downsampled normal events and ends at the
+latest timestamp with positive labels. See
+[the temporal threshold report](reports/temporal_threshold_evaluation.md) for
+split counts, the confusion matrices, and caveats.
+
+To apply the saved validation cutoff to a new raw auth log, use the temporal
+model and its threshold JSON:
+
+```powershell
+python -m soc_ml.cli score-lanl-auth --auth "C:\path\to\new_auth.txt.gz" --model models\lanl_redteam_temporal.joblib --threshold-file models\lanl_temporal_threshold.json --output data\new_auth_scores.csv.gz
+```
+
+This adds `predicted_label` to the output as well as the uncalibrated score.
+Treat the result as an offline ranking/triage aid, not an automated response.
+
 Use the counts printed by `prepare-lanl` with `audit-lanl`:
 
 ```powershell
@@ -143,10 +186,13 @@ events have already been globally downsampled. As a result:
   recall, PR-AUC, calibration, and a validation-selected threshold cannot be
   measured.
 
-The included reports explain these limits. No final temporal test score,
-calibrated probability, or operational threshold is claimed. A defensible
-future-period evaluation requires positive ground-truth labels in later time
-periods and rebuilding the data split from raw logs before sampling.
+The included reports explain these limits. A historical temporal holdout and
+validation-selected cutoff are now available within the labeled interval, but
+they do **not** measure performance after the label period, use a
+natural-prevalence test set, or establish a production operating threshold. A
+defensible prospective evaluation requires positive ground-truth labels in
+later time periods and rebuilding the data split from raw logs before
+sampling.
 
 ### Historical sample result
 

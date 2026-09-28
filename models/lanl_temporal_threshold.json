@@ -1,0 +1,87 @@
+{
+  "selected_threshold": 0.909929947838202,
+  "status": "selected_on_validation_only",
+  "target_validation_redteam_recall": 0.9,
+  "validation": {
+    "time_start": 1072594,
+    "time_end": 1153081,
+    "class_counts": {
+      "normal": 233,
+      "redteam": 175,
+      "total": 408
+    },
+    "metrics_at_selected_threshold": {
+      "threshold": 0.909929947838202,
+      "roc_auc": 0.975217657878602,
+      "average_precision": 0.9264874119661153,
+      "redteam_precision": 0.96,
+      "redteam_recall": 0.96,
+      "redteam_f1": 0.96,
+      "normal_precision": 0.9699570815450643,
+      "normal_recall": 0.9699570815450643,
+      "false_positive_rate": 0.030042918454935622,
+      "true_positives": 168,
+      "false_positives": 7,
+      "false_negatives": 7,
+      "true_negatives": 226
+    }
+  },
+  "training": {
+    "time_start": 30,
+    "time_end": 1072461,
+    "class_counts": {
+      "normal": 2750,
+      "redteam": 351,
+      "total": 3101
+    }
+  },
+  "test": {
+    "time_start": 1153118,
+    "time_end": 2557047,
+    "class_counts": {
+      "normal": 3757,
+      "redteam": 176,
+      "total": 3933
+    },
+    "metrics_at_default_threshold_0_5": {
+      "threshold": 0.5,
+      "roc_auc": 0.981142019744961,
+      "average_precision": 0.5322162876335617,
+      "redteam_precision": 0.5317220543806647,
+      "redteam_recall": 1.0,
+      "redteam_f1": 0.6942800788954635,
+      "normal_precision": 1.0,
+      "normal_recall": 0.9587436784668618,
+      "false_positive_rate": 0.04125632153313814,
+      "true_positives": 176,
+      "false_positives": 155,
+      "false_negatives": 0,
+      "true_negatives": 3602
+    },
+    "metrics_at_validation_selected_threshold": {
+      "threshold": 0.909929947838202,
+      "roc_auc": 0.981142019744961,
+      "average_precision": 0.5322162876335617,
+      "redteam_precision": 0.5846774193548387,
+      "redteam_recall": 0.8238636363636364,
+      "redteam_f1": 0.6839622641509434,
+      "normal_precision": 0.9915875169606513,
+      "normal_recall": 0.9725845089166888,
+      "false_positive_rate": 0.027415491083311153,
+      "true_positives": 145,
+      "false_positives": 103,
+      "false_negatives": 31,
+      "true_negatives": 3654
+    }
+  },
+  "split_method": "Contiguous chronology within the labeled period, using red-team timestamp 50th and 75th percentiles as boundaries.",
+  "model_path": "models\\lanl_redteam_temporal.joblib",
+  "threshold_path": "models\\lanl_temporal_threshold.json",
+  "report_path": "reports\\temporal_threshold_evaluation.md",
+  "limitations": [
+    "Normal rows were globally downsampled before splitting.",
+    "This is a historical temporal holdout within label coverage, not a future-period deployment test.",
+    "Threshold selection optimizes alert reduction subject to the requested validation recall floor.",
+    "Scores are uncalibrated and the selected threshold is not production-validated."
+  ]
+}

@@ -10,6 +10,7 @@ from soc_ml.lanl import (
 )
 from soc_ml.lanl_model import score_lanl_auth, score_lanl_events, train_lanl_model
 from soc_ml.model import score_alerts, train_model
+from soc_ml.operating_point import fit_lanl_temporal_operating_point
 
 
 def test_synthetic_data_is_reproducible_and_labeled():
@@ -282,13 +283,14 @@ def test_raw_lanl_auth_scoring_streams_without_labels_or_entity_ids(tmp_path):
     )
     output_path = tmp_path / "nested" / "scores.csv.gz"
     rows_written = score_lanl_auth(
-        auth_path, model_path, output_path, chunksize=1
+        auth_path, model_path, output_path, chunksize=1, threshold=0.5
     )
     scored = pd.read_csv(output_path)
 
     assert rows_written == 2
     assert len(scored) == 2
     assert scored["redteam_score"].between(0, 1).all()
+    assert set(scored["predicted_label"]).issubset({"normal", "redteam"})
     assert "source_user" not in scored.columns
     assert "redteam" not in scored.columns
 
@@ -296,6 +298,47 @@ def test_raw_lanl_auth_scoring_streams_without_labels_or_entity_ids(tmp_path):
     with pytest.raises(ValueError, match="Output path must differ"):
         score_lanl_auth(auth_path, model_path, auth_path)
     assert auth_path.read_text(encoding="utf-8") == original_auth
+
+
+def test_temporal_threshold_selection_writes_validation_and_test_results(tmp_path):
+    data_path = tmp_path / "prepared.csv"
+    rows = []
+    for i in range(120):
+        redteam = i % 4 == 0
+        rows.append(
+            {
+                "time": i * 100,
+                "authentication_type": "Kerberos" if redteam else "NTLM",
+                "logon_type": "Network" if redteam else "Service",
+                "orientation": "LogOn" if redteam else "LogOff",
+                "success": "Failure" if redteam else "Success",
+                "hour_of_day": i % 24,
+                "machine_account": redteam,
+                "same_computer": not redteam,
+                "redteam": "redteam" if redteam else "normal",
+            }
+        )
+    pd.DataFrame(rows).to_csv(data_path, index=False)
+    model_path = tmp_path / "models" / "temporal.joblib"
+    threshold_path = tmp_path / "models" / "temporal_threshold.json"
+    report_path = tmp_path / "reports" / "temporal.md"
+
+    result = fit_lanl_temporal_operating_point(
+        data_path, model_path, threshold_path, report_path
+    )
+
+    assert model_path.exists()
+    assert threshold_path.exists()
+    assert report_path.exists()
+    assert result["status"] == "selected_on_validation_only"
+    assert 0 <= result["selected_threshold"] <= 1
+    assert (
+        result["validation"]["metrics_at_selected_threshold"]["redteam_recall"]
+        >= 0.90
+    )
+    assert "Untouched later-period holdout" in report_path.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_lanl_audit_writes_reports_and_does_not_select_threshold(tmp_path):
